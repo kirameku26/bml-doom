@@ -1,0 +1,101 @@
+
+<?xml version="1.0" encoding="EUC-JP"?>
+<?bml bml-version="3.0"?>
+<bml>
+  <head>
+    <title>BML Movement Test</title>
+
+    <style><![CDATA[
+      body {
+        resolution: 960x540;
+        used-key-list: basic data-button;
+        background-color: #102040;
+        color: white;
+      }
+
+      #controller {
+        position: absolute;
+        left: 0px;
+        top: 0px;
+        width: 960px;
+        height: 540px;
+        nav-index: 1;
+      }
+
+      #title {
+        position: absolute;
+        left: 40px;
+        top: 30px;
+        width: 800px;
+        height: 50px;
+        font-size: 32px;
+      }
+
+      #player {
+        position: absolute;
+        left: 100px;
+        top: 180px;
+        width: 50px;
+        height: 50px;
+        background-color: #ffff00;
+      }
+
+      #status {
+        position: absolute;
+        left: 40px;
+        top: 450px;
+        width: 600px;
+        height: 40px;
+        font-size: 24px;
+      }
+    ]]></style>
+
+    <script><![CDATA[
+      var x = 100;
+      var y = 180;
+      var speed = 20;
+
+      function init() {
+        document.getElementById("controller").focus();
+      }
+
+      function movePlayer() {
+        var key = document.currentEvent.keyCode;
+
+        if (key == 1) {
+          y -= speed;
+        } else if (key == 2) {
+          y += speed;
+        } else if (key == 3) {
+          x -= speed;
+        } else if (key == 4) {
+          x += speed;
+        }
+
+        // Keep the player inside the screen
+        if (x < 0) x = 0;
+        if (y < 0) y = 0;
+        if (x > 910) x = 910;
+        if (y > 490) y = 490;
+
+        
+
+var player = document.getElementById("player");
+
+player.normalStyle.left = x + "px";
+player.normalStyle.top = y + "px";
+
+        document.getElementById("status")
+          .firstChild.data = "X: " + x + "  Y: " + y;
+      }
+    ]]></script>
+  </head>
+
+  <body onload="init();">
+    <div id="controller" onkeydown="movePlayer();">
+      <p id="title">BML Movement Test</p>
+      <div id="player"></div>
+      <p id="status">X: 100  Y: 180</p>
+    </div>
+  </body>
+</bml>
