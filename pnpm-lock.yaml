@@ -162,13 +162,16 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  web-bml: 39ed95a2fbc3caba4c4ee4a60fdc7888185428a7316fbbe6a618c24e2a5dea78
+
 importers:
 
   .:
     dependencies:
       web-bml:
         specifier: ^1.0.1
-        version: 1.0.1
+        version: 1.0.1(patch_hash=39ed95a2fbc3caba4c4ee4a60fdc7888185428a7316fbbe6a618c24e2a5dea78)
     devDependencies:
       iconv-lite:
         specifier: ^0.7.3
@@ -656,7 +659,7 @@ snapshots:
     optionalDependencies:
       fsevents: 2.3.3
 
-  web-bml@1.0.1:
+  web-bml@1.0.1(patch_hash=39ed95a2fbc3caba4c4ee4a60fdc7888185428a7316fbbe6a618c24e2a5dea78):
     dependencies:
       arib-mmt-tlv-ts: 2.0.2
       crc-32: 1.2.2

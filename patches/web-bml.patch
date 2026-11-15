@@ -1,0 +1,60 @@
+diff --git a/dist/client/interface/DOM.js b/dist/client/interface/DOM.js
+index b43db88587f9b1568e75bb3e993492ca8db51f6b..05c350029e48bc1c188045b5f045ebc77226bd32 100644
+--- a/dist/client/interface/DOM.js
++++ b/dist/client/interface/DOM.js
+@@ -1246,24 +1246,38 @@ var BML;
+                             fetched.blobUrl.set(fetchedClut, imageUrl);
+                         }
+                     }
++                
++} else if (aribType?.toLowerCase() === "image/jpeg") {
++    // DOOMのライブ映像だけ高速表示
++    if (value.endsWith("/live.jpg")) {
++        imageUrl = {
++            blobUrl: this.ownerDocument.resources
++                .getCachedFileBlobUrl(fetched, "doom-direct"),
++        };
++    } else {
++        // 通常のBML JPEGは従来どおり変換
++        imageUrl = fetched.blobUrl.get("BT.709");
++
++        if (imageUrl == null) {
++            try {
++                const bt601 = await globalThis.createImageBitmap(
++                    new Blob([fetched.data])
++                );
++
++                imageUrl = await convertJPEG(bt601);
++
++                if (this.version !== version) {
++                    return;
+                 }
+-                else if (aribType?.toLowerCase() === "image/jpeg") {
+-                    imageUrl = fetched.blobUrl.get("BT.709");
+-                    if (imageUrl == null) {
+-                        try {
+-                            const bt601 = await globalThis.createImageBitmap(new Blob([fetched.data]));
+-                            imageUrl = await (0, arib_jpeg_1.convertJPEG)(bt601);
+-                            if (this.version !== version) {
+-                                return;
+-                            }
+-                        }
+-                        catch {
+-                            this.delete();
+-                            return;
+-                        }
+-                        fetched.blobUrl.set("BT.709", imageUrl);
+-                    }
+-                }
++            } catch {
++                this.delete();
++                return;
++            }
++
++            fetched.blobUrl.set("BT.709", imageUrl);
++        }
++    }
++}
+                 else if (aribType?.toLowerCase() === "image/gif") {
+                     imageUrl = { blobUrl: this.ownerDocument.resources.getCachedFileBlobUrl(fetched) };
+                 }

@@ -10,11 +10,28 @@
       background: #202020;
       color: white;
     }
-    #screen {
-      width: 960px;
-      height: 540px;
-      background: black;
-    }
+    
+#tv-frame {
+  position: relative;
+  width: 100%;
+  max-width: 960px;
+  aspect-ratio: 16 / 9;
+  background: black;
+  overflow: hidden;
+  border: 2px solid #555;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+#screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 960px;
+  height: 540px;
+  transform-origin: top left;
+}
+
     button {
       padding: 10px 20px;
       cursor: pointer;
@@ -24,8 +41,13 @@
 <body>
   <h2>BML Developer</h2>
 
+
+<div id="tv-frame">
   <div id="screen"></div>
-  <div id="media" hidden></div>
+</div>
+
+<div id="media" hidden></div>
+
 
   <p>
     <button data-key="ArrowUp">↑</button>

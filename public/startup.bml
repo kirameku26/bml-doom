@@ -3,99 +3,93 @@
 <?bml bml-version="3.0"?>
 <bml>
   <head>
-    <title>BML Movement Test</title>
+    <title>DOOM Dynamic Framebuffer</title>
 
     <style><![CDATA[
       body {
         resolution: 960x540;
-        used-key-list: basic data-button;
-        background-color: #102040;
+        background-color: black;
         color: white;
       }
 
-      #controller {
+      #frame {
         position: absolute;
         left: 0px;
         top: 0px;
         width: 960px;
         height: 540px;
-        nav-index: 1;
-      }
-
-      #title {
-        position: absolute;
-        left: 40px;
-        top: 30px;
-        width: 800px;
-        height: 50px;
-        font-size: 32px;
-      }
-
-      #player {
-        position: absolute;
-        left: 100px;
-        top: 180px;
-        width: 50px;
-        height: 50px;
-        background-color: #ffff00;
       }
 
       #status {
         position: absolute;
-        left: 40px;
-        top: 450px;
-        width: 600px;
+        left: 10px;
+        top: 10px;
+        width: 850px;
         height: 40px;
         font-size: 24px;
+        color: yellow;
+        background-color: black;
       }
     ]]></style>
 
     <script><![CDATA[
-      var x = 100;
-      var y = 180;
-      var speed = 20;
+      var updates = 0;
+      var lastReport = 0;
+      var lastUpdate = 0;
+      var minGap = 99999;
+      var maxGap = 0;
 
-      function init() {
-        document.getElementById("controller").focus();
-      }
+      function refresh() {
+        var now = (new Date()).getTime();
 
-      function movePlayer() {
-        var key = document.currentEvent.keyCode;
+        if (lastUpdate != 0) {
+          var gap = now - lastUpdate;
 
-        if (key == 1) {
-          y -= speed;
-        } else if (key == 2) {
-          y += speed;
-        } else if (key == 3) {
-          x -= speed;
-        } else if (key == 4) {
-          x += speed;
+          if (gap < minGap) minGap = gap;
+          if (gap > maxGap) maxGap = gap;
         }
 
-        // Keep the player inside the screen
-        if (x < 0) x = 0;
-        if (y < 0) y = 0;
-        if (x > 910) x = 910;
-        if (y > 490) y = 490;
+        lastUpdate = now;
 
-        
+        // Request the newest image module data
+        document.getElementById("frame").data =
+          "/40/0001/live.jpg";
 
-var player = document.getElementById("player");
+        updates++;
 
-player.normalStyle.left = x + "px";
-player.normalStyle.top = y + "px";
+        var elapsed = now - lastReport;
 
-        document.getElementById("status")
-          .firstChild.data = "X: " + x + "  Y: " + y;
+        if (elapsed >= 1000) {
+          var ups = (updates * 1000 / elapsed) | 0;
+
+          document.getElementById("status")
+            .firstChild.data =
+              "UPS: " + ups +
+              " MIN: " + minGap +
+              "ms MAX: " + maxGap + "ms";
+
+          updates = 0;
+          minGap = 99999;
+          maxGap = 0;
+          lastReport = now;
+        }
+      }
+
+      function init() {
+        lastReport = (new Date()).getTime();
+
+        browser.setInterval("refresh()", 50, 0);
       }
     ]]></script>
   </head>
 
   <body onload="init();">
-    <div id="controller" onkeydown="movePlayer();">
-      <p id="title">BML Movement Test</p>
-      <div id="player"></div>
-      <p id="status">X: 100  Y: 180</p>
-    </div>
+    <object
+      id="frame"
+      type="image/jpeg"
+      data="/40/0001/live.jpg">
+    </object>
+
+    <p id="status">Starting...</p>
   </body>
 </bml>

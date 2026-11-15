@@ -1,1 +1,3 @@
 node_modules
+# Game assets downloaded separately
+assets/*.wad

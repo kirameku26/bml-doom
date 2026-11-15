@@ -1,1 +1,3 @@
 blockExoticSubdeps: false
+patchedDependencies:
+  web-bml: patches/web-bml.patch
