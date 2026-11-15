@@ -36,7 +36,6 @@ function resizeBML() {
     screen.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
 }
 
-
 let statusObserver = null;
 
 browser.addEventListener("load", (event) => {
@@ -47,32 +46,23 @@ browser.addEventListener("load", (event) => {
 
     resizeBML();
 
-    // Stop observing the previous BML document
+    // Keep BML statistics in the browser console, not on the BML screen.
     statusObserver?.disconnect();
-
-    // Access the BML document inside web-bml
-    const status = browser.content.documentElement
-        .querySelector("#status");
-
-    if (!status) {
-        console.warn("[BML] Status element not found");
-        return;
+    const status = browser.content.documentElement.querySelector("#status");
+    if (status) {
+        status.style.visibility = "hidden";
+        statusObserver = new MutationObserver(() => {
+            const value = status.textContent?.trim();
+            if (value && value !== "Starting...") {
+                console.log("[BML]", value);
+            }
+        });
+        statusObserver.observe(status, {
+            subtree: true,
+            characterData: true,
+            childList: true,
+        });
     }
-
-    // Log BML statistics whenever they change
-    statusObserver = new MutationObserver(() => {
-        const value = status.textContent?.trim();
-
-        if (value && value !== "Starting...") {
-            console.log("[BML]", value);
-        }
-    });
-
-    statusObserver.observe(status, {
-        subtree: true,
-        characterData: true,
-        childList: true,
-    });
 });
 
 window.addEventListener("resize", resizeBML);
@@ -193,52 +183,93 @@ async function start() {
         return btoa(binary);
     }
 
-    // Dynamically generated framebuffer
-    const canvas = document.createElement("canvas");
-    canvas.width = 960;
-    canvas.height = 540;
-
-    const ctx = canvas.getContext("2d");
-
-    if (!ctx) {
-        throw new Error("Canvas 2D unavailable");
-    }
-
-    // Load the real DOOM engine
-    const doomModuleUrl = new URL("/doom/doom.mjs", window.location.origin)
-        .href;
-
-    const { default: createDoom } = await import(
-        /* @vite-ignore */ doomModuleUrl
+    // The DOOM WebAssembly engine runs in its own dedicated worker.
+    // The main thread remains responsible for BML and input/UI events.
+    const doomWorker = new Worker(
+        new URL("./doom-worker.js", import.meta.url),
+        { type: "module" },
     );
 
-    const doom = await createDoom({
-        locateFile: (filename) => `/doom/${filename}`,
-        print: console.log,
-        printErr: console.error,
+    let nextDoomFrameId = 0;
+    const pendingDoomFrames = new Map();
+    let settleDoomReady;
+    let failDoomReady;
+    const doomReady = new Promise((resolve, reject) => {
+        settleDoomReady = resolve;
+        failDoomReady = reject;
     });
 
-    // Initialize DOOM
-    await doom._doom_init();
-
-    console.log("DOOM engine initialized");
-
-    // DOOM framebuffer: 320x200
-    const doomCanvas = document.createElement("canvas");
-    doomCanvas.width = 320;
-    doomCanvas.height = 200;
-
-    const doomCtx = doomCanvas.getContext("2d");
-
-    if (!doomCtx) {
-        throw new Error("DOOM Canvas 2D unavailable");
+    function failDoomRequests(error) {
+        failDoomReady(error);
+        for (const pending of pendingDoomFrames.values()) {
+            pending.reject(error);
+        }
+        pendingDoomFrames.clear();
     }
 
-    const doomImage = doomCtx.createImageData(320, 200);
+    doomWorker.onmessage = ({ data }) => {
+        switch (data.type) {
+            case "ready":
+                settleDoomReady();
+                break;
+            case "frame": {
+                const pending = pendingDoomFrames.get(data.id);
+                if (!pending) return;
+                pendingDoomFrames.delete(data.id);
+                pending.resolve({
+                    pixels: new Uint8ClampedArray(data.buffer),
+                    doomMs: data.doomMs,
+                    conversionMs: data.conversionMs,
+                });
+                break;
+            }
+            case "error": {
+                const error = new Error(data.message);
+                const pending = pendingDoomFrames.get(data.id);
+                if (pending) {
+                    pendingDoomFrames.delete(data.id);
+                    pending.reject(error);
+                } else {
+                    console.error("[DOOM WORKER]", error);
+                }
+                break;
+            }
+            case "fatal":
+                failDoomRequests(new Error(data.message));
+                break;
+            case "stdout":
+                console.log("[DOOM]", data.message);
+                break;
+            case "stderr":
+                console.error("[DOOM]", data.message);
+                break;
+        }
+    };
 
-    // Unified DOOM input handling is configured below.
+    doomWorker.onerror = (event) => {
+        failDoomRequests(new Error(event.message || "DOOM worker crashed"));
+    };
+    doomWorker.onmessageerror = () => {
+        failDoomRequests(new Error("DOOM worker message could not be decoded"));
+    };
 
-    let frameNumber = 0;
+    function stepDoom() {
+        const id = ++nextDoomFrameId;
+        return new Promise((resolve, reject) => {
+            pendingDoomFrames.set(id, { resolve, reject });
+            doomWorker.postMessage({ type: "step", id });
+        });
+    }
+
+    function sendDoomKey(pressed, key) {
+        doomWorker.postMessage({ type: "key", pressed, key });
+    }
+
+    doomWorker.postMessage({ type: "init" });
+    await doomReady;
+    console.log("DOOM engine initialized in Web Worker");
+
+    // JPEG encoding remains in jpeg-worker.js.
     let imageVersion = 0;
 
     let encoding = false;
@@ -308,43 +339,30 @@ async function start() {
         });
     }
 
-    // generateJPEG() の中
-
+    // Wait for the DOOM worker, then pass its transferred RGBA buffer
+    // to the existing JPEG encoder worker without copying it again.
     async function generateJPEG() {
         const t0 = performance.now();
+        const { pixels, doomMs, conversionMs } = await stepDoom();
 
-        await doom._doom_step();
+        if (doomMs > 50) {
+            console.warn("[SLOW DOOM]", doomMs.toFixed(1), "ms");
+        }
 
         const t1 = performance.now();
-
-        if (t1 - t0 > 50) {
-            console.warn("[SLOW DOOM]", (t1 - t0).toFixed(1), "ms");
-        }
-
-        const ptr = doom._doom_framebuffer();
-
-        if (!ptr) {
-            throw new Error("DOOM framebuffer unavailable");
-        }
-
-        const source = doom.HEAPU8;
-        const pixels = new Uint8ClampedArray(320 * 200 * 4);
-
-        for (let i = 0; i < pixels.length; i += 4) {
-            pixels[i] = source[ptr + i + 2];
-            pixels[i + 1] = source[ptr + i + 1];
-            pixels[i + 2] = source[ptr + i];
-            pixels[i + 3] = 255;
-        }
-
+        const jpeg = await encodeFrame(pixels);
         const t2 = performance.now();
 
-        const jpeg = await encodeFrame(pixels);
+        if (t2 - t1 > 100) {
+            console.warn("[SLOW JPEG WORKER]", (t2 - t1).toFixed(1), "ms");
+        }
 
-        const t3 = performance.now();
-
-        if (t3 - t2 > 100) {
-            console.warn("[SLOW WORKER]", (t3 - t2).toFixed(1), "ms");
+        if (t2 - t0 > 150) {
+            console.warn("[SLOW FRAME PIPELINE]", {
+                totalMs: (t2 - t0).toFixed(1),
+                doomMs: doomMs.toFixed(1),
+                conversionMs: conversionMs.toFixed(1),
+            });
         }
 
         return jpeg;
@@ -514,7 +532,7 @@ async function start() {
         if (pressedKeys.has(key)) return;
 
         pressedKeys.add(key);
-        doom._doom_key(1, key);
+        sendDoomKey(true, key);
     }
 
     function resolveDoomKey(keyName) {
@@ -539,7 +557,7 @@ async function start() {
         if (!pressedKeys.has(key)) return;
 
         pressedKeys.delete(key);
-        doom._doom_key(0, key);
+        sendDoomKey(false, key);
     }
 
     // Physical keyboard
@@ -580,7 +598,7 @@ async function start() {
     // Release held keys when the window loses focus
     window.addEventListener("blur", () => {
         for (const key of pressedKeys) {
-            doom._doom_key(0, key);
+            sendDoomKey(false, key);
         }
 
         pressedKeys.clear();

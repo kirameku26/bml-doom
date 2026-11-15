@@ -36,7 +36,7 @@ emcc \
   -sMODULARIZE=1 \
   -sEXPORT_ES6=1 \
   --no-entry \
-  -sENVIRONMENT=web \
+  -sENVIRONMENT=web,worker \
   -sALLOW_MEMORY_GROWTH=1 \
   -sASSERTIONS=1 \
   -sEXPORTED_FUNCTIONS='["_doom_init","_doom_step","_doom_framebuffer","_doom_key"]' \
