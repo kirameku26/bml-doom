@@ -36,6 +36,9 @@ function resizeBML() {
     screen.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
 }
 
+
+let statusObserver = null;
+
 browser.addEventListener("load", (event) => {
     console.log("BML loaded:", event.detail);
 
@@ -43,6 +46,33 @@ browser.addEventListener("load", (event) => {
     bmlHeight = event.detail.resolution.height;
 
     resizeBML();
+
+    // Stop observing the previous BML document
+    statusObserver?.disconnect();
+
+    // Access the BML document inside web-bml
+    const status = browser.content.documentElement
+        .querySelector("#status");
+
+    if (!status) {
+        console.warn("[BML] Status element not found");
+        return;
+    }
+
+    // Log BML statistics whenever they change
+    statusObserver = new MutationObserver(() => {
+        const value = status.textContent?.trim();
+
+        if (value && value !== "Starting...") {
+            console.log("[BML]", value);
+        }
+    });
+
+    statusObserver.observe(status, {
+        subtree: true,
+        characterData: true,
+        childList: true,
+    });
 });
 
 window.addEventListener("resize", resizeBML);

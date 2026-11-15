@@ -1,3 +1,51 @@
-node_modules
-# Game assets downloaded separately
-assets/*.wad
+
+# Dependencies
+node_modules/
+
+# Vite build output
+dist/
+.vite/
+*.local
+
+# Emscripten / C build artifacts
+*.o
+*.a
+*.bc
+*.d
+*.dSYM/
+*.wasm.map
+
+# Generated DOOM WebAssembly
+public/doom/
+
+# Generated BML
+public/startup.bml
+
+# Temporary pnpm patch workspace
+.web-bml-edit/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Temporary files
+*.tmp
+*.bak
+*~
